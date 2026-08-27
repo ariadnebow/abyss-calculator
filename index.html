@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>어비스 침식 브익 계산기</title>
 <style>
-body{margin:0;background:#0f1115;color:#f4f6fb;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif}
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
+body{margin:0;background:#0f1115;color:#f4f6fb;font-family:"Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif}
 .wrap{max-width:560px;margin:auto;padding:16px}
 .card{background:#171a21;border:1px solid #2b3140;border-radius:16px;padding:16px;margin:12px 0}
 h1{font-size:23px;margin:0 0 8px}
@@ -13,12 +14,13 @@ p{color:#a9b0bf;font-size:13px;line-height:1.5}
 label{display:block;color:#a9b0bf;font-size:13px;margin:12px 0 6px}
 input,select,button{width:100%;box-sizing:border-box;border-radius:12px;padding:14px;font-size:17px}
 input,select{background:#101319;color:white;border:1px solid #2b3140}
-button{margin-top:16px;border:0;background:#8aa6ff;color:#111522;font-weight:800}
+button{margin-top:16px;border:0;background:#f3aa8e;color:#171a2b;font-weight:800}
 .tabs{display:grid;gap:8px}
 .setupTabs{grid-template-columns:repeat(3,1fr)}
 .dungeonTabs{grid-template-columns:repeat(2,1fr)}
 .tab{margin:0;padding:11px 8px;background:#101319;color:#cbd2df;border:1px solid #2b3140;font-size:14px;line-height:1.3}
-.tab.active{background:#8aa6ff;color:#111522;border-color:#8aa6ff}
+.tab[data-target="setup"].active{background:#b8a7f2;color:#171a2b;border-color:#b8a7f2}
+.tab[data-target="dungeon"].active{background:#83d8c3;color:#171a2b;border-color:#83d8c3}
 .customTime{margin-top:8px}
 .result{font-size:15px;line-height:1.7}
 .resultTitle{font-size:20px;font-weight:800;margin-bottom:8px}
