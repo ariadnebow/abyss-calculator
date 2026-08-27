@@ -21,12 +21,25 @@ button{margin-top:16px;border:0;background:#8aa6ff;color:#111522;font-weight:800
 .mid{color:#f1c95d;font-size:22px;font-weight:900}
 .small{font-size:12px;color:#9ba3b4}
 hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
+.timelineWrap{margin-top:16px}
+.timelineTitle{color:#dfe4ef;font-size:13px;font-weight:800;margin-bottom:8px}
+.timeline{display:flex;width:100%;height:38px;overflow:hidden;border:1px solid #2b3140;border-radius:10px;background:#101319}
+.timelineSegment{min-width:2px;display:flex;align-items:center;justify-content:center;color:#111522;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden}
+.timelineSegment.boost{background:#65d09b}
+.timelineSegment.pollution{background:#ff7b7b}
+.timelineSegment.normal{background:#f1c95d}
+.timelineScale{display:flex;justify-content:space-between;margin-top:5px;color:#858d9d;font-size:11px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:10px;color:#a9b0bf;font-size:12px}
+.legendItem{display:flex;align-items:center;gap:5px}
+.dot{width:9px;height:9px;border-radius:3px;display:inline-block}
+.dot.boost{background:#65d09b}.dot.pollution{background:#ff7b7b}.dot.normal{background:#f1c95d}
+.creator{text-align:center;color:#858d9d;font-size:12px;margin:18px 0 8px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>어비스 침식 브익 계산기</h1>
-  <p>캠파 오염 수치 → 세팅 → 어비스를 선택하고 결과 확인을 누르세요.</p>
+  <p>보스방 앞의 캠파 오염 수치 → 세팅 → 어비스를 선택하고 결과 확인을 누르세요.</p>
 
   <div class="card">
     <label>캠파 현재 오염 수치 (0~299)</label>
@@ -35,6 +48,7 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
     <label>세팅</label>
     <select id="setup">
       <option value="one">노 영밤 · 1침식 (+5/초, 오염 15초)</option>
+      <option value="twoNoNight">노 영밤 · 2침식 (+10/초, 오염 15초)</option>
       <option value="two">영밤 · 2침식 (+10/초, 오염 10.05초)</option>
     </select>
 
@@ -55,18 +69,30 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
     <div class="resultTitle">결과</div>
     <div id="mainState">위 값을 선택하고 <b>결과 확인</b>을 눌러주세요.</div>
     <div id="details"></div>
+    <div class="timelineWrap" id="graph" hidden>
+      <div class="timelineTitle">브익 중 상태 흐름</div>
+      <div class="timeline" id="timeline" role="img"></div>
+      <div class="timelineScale"><span>0초 · 브익 시작</span><span id="timelineEnd"></span></div>
+      <div class="legend">
+        <span class="legendItem"><i class="dot boost"></i>침식 강화</span>
+        <span class="legendItem"><i class="dot pollution"></i>오염</span>
+        <span class="legendItem"><i class="dot normal"></i>일반 구간</span>
+      </div>
+    </div>
   </div>
 
   <div class="card small">
     기준: 300 도달 즉시 오염 진입. 오염 종료 후 0부터 다시 축적.
     강화 구간은 100 이상 300 미만입니다.
   </div>
+  <div class="creator">만든이 : 아리아드네</div>
 </div>
 
 <script>
 (function(){
   var setups = {
     one:{name:"노 영밤 · 1침식", rate:5, polluted:15},
+    twoNoNight:{name:"노 영밤 · 2침식", rate:10, polluted:15},
     two:{name:"영밤 · 2침식", rate:10, polluted:10.05}
   };
   var dungeons = {
@@ -111,6 +137,7 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
   function getBreakSummary(start, from, dur, s){
     var step=0.01;
     var normal=0, boost=0, pollution=0;
+    var segments=[];
     var t=0;
     while(t<dur-0.000001){
       var slice=Math.min(step,dur-t);
@@ -118,9 +145,35 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
       if(st.kind==="boost") boost+=slice;
       else if(st.kind==="pollution") pollution+=slice;
       else normal+=slice;
+      var kind=(st.kind==="boost"||st.kind==="pollution")?st.kind:"normal";
+      var last=segments[segments.length-1];
+      if(last&&last.kind===kind) last.duration+=slice;
+      else segments.push({kind:kind,duration:slice});
       t+=slice;
     }
-    return {normal:normal,boost:boost,pollution:pollution};
+    return {normal:normal,boost:boost,pollution:pollution,segments:segments};
+  }
+
+  function renderTimeline(sum,dur){
+    var timeline=document.getElementById("timeline");
+    var graph=document.getElementById("graph");
+    var names={boost:"침식 강화",pollution:"오염",normal:"일반 구간"};
+    timeline.innerHTML="";
+
+    for(var i=0;i<sum.segments.length;i++){
+      var seg=sum.segments[i];
+      var item=document.createElement("div");
+      item.className="timelineSegment "+seg.kind;
+      item.style.flexGrow=String(Math.max(seg.duration,0.001));
+      item.style.flexBasis="0";
+      item.title=names[seg.kind]+" · "+fmt(seg.duration)+"초";
+      if(seg.duration/dur>=0.14) item.textContent=fmt(seg.duration)+"초";
+      timeline.appendChild(item);
+    }
+
+    timeline.setAttribute("aria-label","브익 "+fmt(dur)+"초 중 침식 강화 "+fmt(sum.boost)+"초, 오염 "+fmt(sum.pollution)+"초, 일반 구간 "+fmt(sum.normal)+"초");
+    document.getElementById("timelineEnd").textContent=fmt(dur)+"초 · 종료";
+    graph.hidden=false;
   }
 
   function calculate(){
@@ -172,10 +225,12 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
         "<br>🟢 강화: <b>"+fmt(sum.boost)+"초</b>"+
         "<br>🔴 오염: <b>"+fmt(sum.pollution)+"초</b>"+
         "<br>🟡 일반: <b>"+fmt(sum.normal)+"초</b>";
+      renderTimeline(sum,dur);
     }catch(e){
       document.getElementById("mainState").className="bad";
       document.getElementById("mainState").textContent="계산 오류";
       document.getElementById("details").textContent=String(e);
+      document.getElementById("graph").hidden=true;
     }
   }
 
