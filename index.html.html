@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>어비스 침식 브익 계산기</title>
+<style>
+body{margin:0;background:#0f1115;color:#f4f6fb;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif}
+.wrap{max-width:560px;margin:auto;padding:16px}
+.card{background:#171a21;border:1px solid #2b3140;border-radius:16px;padding:16px;margin:12px 0}
+h1{font-size:23px;margin:0 0 8px}
+p{color:#a9b0bf;font-size:13px;line-height:1.5}
+label{display:block;color:#a9b0bf;font-size:13px;margin:12px 0 6px}
+input,select,button{width:100%;box-sizing:border-box;border-radius:12px;padding:14px;font-size:17px}
+input,select{background:#101319;color:white;border:1px solid #2b3140}
+button{margin-top:16px;border:0;background:#8aa6ff;color:#111522;font-weight:800}
+.result{font-size:15px;line-height:1.7}
+.resultTitle{font-size:20px;font-weight:800;margin-bottom:8px}
+.good{color:#65d09b;font-size:22px;font-weight:900}
+.bad{color:#ff7b7b;font-size:22px;font-weight:900}
+.mid{color:#f1c95d;font-size:22px;font-weight:900}
+.small{font-size:12px;color:#9ba3b4}
+hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>어비스 침식 브익 계산기</h1>
+  <p>캠파 오염 수치 → 세팅 → 어비스를 선택하고 결과 확인을 누르세요.</p>
+
+  <div class="card">
+    <label>캠파 현재 오염 수치 (0~299)</label>
+    <input id="stack" type="number" min="0" max="299" value="200">
+
+    <label>세팅</label>
+    <select id="setup">
+      <option value="one">노 영밤 · 1침식 (+5/초, 오염 15초)</option>
+      <option value="two">영밤 · 2침식 (+10/초, 오염 10.05초)</option>
+    </select>
+
+    <label>어비스</label>
+    <select id="dungeon">
+      <option value="dock">허상의 정박지 · 15초 브익</option>
+      <option value="cave">광기의 동굴 · 35초 브익</option>
+      <option value="water">흩어진 물길 · 40초 브익</option>
+    </select>
+
+    <label>브익 지속시간 (초)</label>
+    <input id="duration" type="number" min="1" max="30" step="0.1" value="10">
+
+    <button type="button" id="calcBtn">결과 확인</button>
+  </div>
+
+  <div class="card result" id="result">
+    <div class="resultTitle">결과</div>
+    <div id="mainState">위 값을 선택하고 <b>결과 확인</b>을 눌러주세요.</div>
+    <div id="details"></div>
+  </div>
+
+  <div class="card small">
+    기준: 300 도달 즉시 오염 진입. 오염 종료 후 0부터 다시 축적.
+    강화 구간은 100 이상 300 미만입니다.
+  </div>
+</div>
+
+<script>
+(function(){
+  var setups = {
+    one:{name:"노 영밤 · 1침식", rate:5, polluted:15},
+    two:{name:"영밤 · 2침식", rate:10, polluted:10.05}
+  };
+  var dungeons = {
+    dock:{name:"허상의 정박지", time:15},
+    cave:{name:"광기의 동굴", time:35},
+    water:{name:"흩어진 물길", time:40}
+  };
+
+  function fmt(x){
+    var r=Math.round(x*10)/10;
+    return Math.abs(r-Math.round(r))<0.0001 ? String(Math.round(r)) : r.toFixed(1);
+  }
+
+  function getState(start, t, s){
+    var time=0;
+    var stack=start;
+    var guard=0;
+    while(guard++<100){
+      var to300=(300-stack)/s.rate;
+
+      if(t < time+to300-0.0000001){
+        var current=stack+s.rate*(t-time);
+        return {kind:(current>=100?"boost":"normal"), stack:current};
+      }
+
+      time += to300;
+
+      if(t < time+s.polluted-0.0000001){
+        return {kind:"pollution", elapsed:t-time};
+      }
+
+      time += s.polluted;
+      stack=0;
+
+      if(Math.abs(t-time)<0.0000001){
+        return {kind:"normal", stack:0};
+      }
+    }
+    return {kind:"error"};
+  }
+
+  function getBreakSummary(start, from, dur, s){
+    var step=0.01;
+    var normal=0, boost=0, pollution=0;
+    var t=0;
+    while(t<dur-0.000001){
+      var slice=Math.min(step,dur-t);
+      var st=getState(start,from+t+slice/2,s);
+      if(st.kind==="boost") boost+=slice;
+      else if(st.kind==="pollution") pollution+=slice;
+      else normal+=slice;
+      t+=slice;
+    }
+    return {normal:normal,boost:boost,pollution:pollution};
+  }
+
+  function calculate(){
+    try{
+      var start=parseFloat(document.getElementById("stack").value);
+      if(isNaN(start)) start=0;
+      if(start<0) start=0;
+      if(start>299) start=299;
+
+      var dur=parseFloat(document.getElementById("duration").value);
+      if(isNaN(dur)||dur<=0) dur=10;
+
+      var s=setups[document.getElementById("setup").value];
+      var d=dungeons[document.getElementById("dungeon").value];
+
+      var st=getState(start,d.time,s);
+      var sum=getBreakSummary(start,d.time,dur,s);
+
+      var main=document.getElementById("mainState");
+      var details=document.getElementById("details");
+
+      if(st.kind==="boost"){
+        main.className="good";
+        main.textContent="🟢 브익 시작: "+fmt(st.stack)+" 스택 · 침식 강화";
+      }else if(st.kind==="pollution"){
+        main.className="bad";
+        main.textContent="🔴 브익 시작: 오염 중 · "+fmt(st.elapsed)+"초째";
+      }else{
+        main.className="mid";
+        main.textContent="🟡 브익 시작: "+fmt(st.stack)+" 스택 · 일반 구간";
+      }
+
+      var verdict="";
+      if(sum.pollution<0.02 && sum.boost>dur-0.02){
+        verdict="✅ 브익 전체가 100~299 강화 구간";
+      }else if(sum.pollution>=0.02){
+        verdict="⚠️ 브익 중 오염이 "+fmt(sum.pollution)+"초 끼어듦";
+      }else if(sum.boost>=0.02){
+        verdict="△ 브익 일부만 강화 구간";
+      }else{
+        verdict="△ 브익 동안 강화 구간 아님";
+      }
+
+      details.innerHTML=
+        "<hr><b>"+d.name+"</b> / "+s.name+
+        "<br>보스방 입장 후 <b>"+d.time+"초</b>에 브익 시작"+
+        "<br>"+verdict+
+        "<br><br>브익 "+fmt(dur)+"초 구성"+
+        "<br>🟢 강화: <b>"+fmt(sum.boost)+"초</b>"+
+        "<br>🔴 오염: <b>"+fmt(sum.pollution)+"초</b>"+
+        "<br>🟡 일반: <b>"+fmt(sum.normal)+"초</b>";
+    }catch(e){
+      document.getElementById("mainState").className="bad";
+      document.getElementById("mainState").textContent="계산 오류";
+      document.getElementById("details").textContent=String(e);
+    }
+  }
+
+  document.getElementById("calcBtn").onclick=calculate;
+})();
+</script>
+</body>
+</html>
