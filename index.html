@@ -14,6 +14,12 @@ label{display:block;color:#a9b0bf;font-size:13px;margin:12px 0 6px}
 input,select,button{width:100%;box-sizing:border-box;border-radius:12px;padding:14px;font-size:17px}
 input,select{background:#101319;color:white;border:1px solid #2b3140}
 button{margin-top:16px;border:0;background:#8aa6ff;color:#111522;font-weight:800}
+.tabs{display:grid;gap:8px}
+.setupTabs{grid-template-columns:repeat(3,1fr)}
+.dungeonTabs{grid-template-columns:repeat(2,1fr)}
+.tab{margin:0;padding:11px 8px;background:#101319;color:#cbd2df;border:1px solid #2b3140;font-size:14px;line-height:1.3}
+.tab.active{background:#8aa6ff;color:#111522;border-color:#8aa6ff}
+.customTime{margin-top:8px}
 .result{font-size:15px;line-height:1.7}
 .resultTitle{font-size:20px;font-weight:800;margin-bottom:8px}
 .good{color:#65d09b;font-size:22px;font-weight:900}
@@ -43,24 +49,31 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
 
   <div class="card">
     <label>캠파 현재 오염 수치 (0~299)</label>
-    <input id="stack" type="number" min="0" max="299" value="200">
+    <input id="stack" type="number" min="0" max="299" value="200" inputmode="numeric" pattern="[0-9]*">
 
     <label>세팅</label>
-    <select id="setup">
-      <option value="one">노 영밤 · 1침식 (+5/초, 오염 15초)</option>
-      <option value="twoNoNight">노 영밤 · 2침식 (+10/초, 오염 15초)</option>
-      <option value="two">영밤 · 2침식 (+10/초, 오염 10.05초)</option>
-    </select>
+    <div class="tabs setupTabs" role="group" aria-label="세팅 선택">
+      <button type="button" class="tab active" data-target="setup" data-value="one">노 영밤<br>1침식</button>
+      <button type="button" class="tab" data-target="setup" data-value="twoNoNight">노 영밤<br>2침식</button>
+      <button type="button" class="tab" data-target="setup" data-value="two">영밤<br>2침식</button>
+    </div>
+    <input id="setup" type="hidden" value="one">
 
     <label>어비스</label>
-    <select id="dungeon">
-      <option value="dock">허상의 정박지 · 15초 브익</option>
-      <option value="cave">광기의 동굴 · 35초 브익</option>
-      <option value="water">흩어진 물길 · 40초 브익</option>
-    </select>
+    <div class="tabs dungeonTabs" role="group" aria-label="어비스 선택">
+      <button type="button" class="tab active" data-target="dungeon" data-value="dock">허상의 정박지<br>15초 후</button>
+      <button type="button" class="tab" data-target="dungeon" data-value="cave">광기의 동굴<br>35초 후</button>
+      <button type="button" class="tab" data-target="dungeon" data-value="water">흩어진 물길<br>40초 후</button>
+      <button type="button" class="tab" data-target="dungeon" data-value="custom">기타<br>직접 입력</button>
+    </div>
+    <input id="dungeon" type="hidden" value="dock">
+    <div class="customTime" id="customTimeWrap" hidden>
+      <label for="customTime">브익 시작 시간 (초)</label>
+      <input id="customTime" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" placeholder="예: 16, 17, 43">
+    </div>
 
     <label>브익 지속시간 (초)</label>
-    <input id="duration" type="number" min="1" max="30" step="0.1" value="10">
+    <input id="duration" type="number" min="1" max="30" step="1" value="10" inputmode="numeric" pattern="[0-9]*">
 
     <button type="button" id="calcBtn">결과 확인</button>
   </div>
@@ -98,8 +111,34 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
   var dungeons = {
     dock:{name:"허상의 정박지", time:15},
     cave:{name:"광기의 동굴", time:35},
-    water:{name:"흩어진 물길", time:40}
+    water:{name:"흩어진 물길", time:40},
+    custom:{name:"기타", time:0}
   };
+
+  function selectTab(button){
+    var target=button.getAttribute("data-target");
+    var value=button.getAttribute("data-value");
+    document.getElementById(target).value=value;
+    var buttons=document.querySelectorAll('.tab[data-target="'+target+'"]');
+    for(var i=0;i<buttons.length;i++) buttons[i].classList.toggle("active",buttons[i]===button);
+    if(target==="dungeon"){
+      var wrap=document.getElementById("customTimeWrap");
+      wrap.hidden=value!=="custom";
+      if(value==="custom") document.getElementById("customTime").focus();
+    }
+  }
+
+  var tabButtons=document.querySelectorAll(".tab");
+  for(var tabIndex=0;tabIndex<tabButtons.length;tabIndex++){
+    tabButtons[tabIndex].addEventListener("click",function(){ selectTab(this); });
+  }
+
+  var integerInputs=["stack","customTime","duration"];
+  for(var inputIndex=0;inputIndex<integerInputs.length;inputIndex++){
+    document.getElementById(integerInputs[inputIndex]).addEventListener("input",function(){
+      this.value=this.value.replace(/[^0-9]/g,"");
+    });
+  }
 
   function fmt(x){
     var r=Math.round(x*10)/10;
@@ -183,11 +222,19 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
       if(start<0) start=0;
       if(start>299) start=299;
 
-      var dur=parseFloat(document.getElementById("duration").value);
+      var dur=parseInt(document.getElementById("duration").value,10);
       if(isNaN(dur)||dur<=0) dur=10;
 
       var s=setups[document.getElementById("setup").value];
       var d=dungeons[document.getElementById("dungeon").value];
+      if(document.getElementById("dungeon").value==="custom"){
+        var customTime=parseInt(document.getElementById("customTime").value,10);
+        if(isNaN(customTime)||customTime<0){
+          document.getElementById("customTime").focus();
+          throw new Error("기타 브익 시작 시간을 숫자로 입력해 주세요.");
+        }
+        d={name:"기타 ("+customTime+"초 후)",time:customTime};
+      }
 
       var st=getState(start,d.time,s);
       var sum=getBreakSummary(start,d.time,dur,s);
