@@ -16,10 +16,12 @@ input,select,button{width:100%;box-sizing:border-box;border-radius:12px;padding:
 input,select{background:#101319;color:white;border:1px solid #2b3140}
 button{margin-top:16px;border:0;background:#f3aa8e;color:#171a2b;font-weight:800}
 .tabs{display:grid;gap:8px}
-.setupTabs{grid-template-columns:repeat(3,1fr)}
+.nightTabs{grid-template-columns:repeat(2,1fr)}
+.runeTabs{grid-template-columns:repeat(3,1fr)}
 .dungeonTabs{grid-template-columns:repeat(2,1fr)}
 .tab{margin:0;padding:11px 8px;background:#101319;color:#cbd2df;border:1px solid #2b3140;font-size:14px;line-height:1.3}
-.tab[data-target="setup"].active{background:#b8a7f2;color:#171a2b;border-color:#b8a7f2}
+.tab[data-target="night"].active{background:#b8a7f2;color:#171a2b;border-color:#b8a7f2}
+.tab[data-target="runes"].active{background:#b8a7f2;color:#171a2b;border-color:#b8a7f2}
 .tab[data-target="dungeon"].active{background:#83d8c3;color:#171a2b;border-color:#83d8c3}
 .customTime{margin-top:8px}
 .result{font-size:15px;line-height:1.7}
@@ -47,19 +49,26 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
 <body>
 <div class="wrap">
   <h1>어비스 침식 브익 계산기</h1>
-  <p>보스방 앞의 캠파 오염 수치 → 세팅 → 어비스를 선택하고 결과 확인을 누르세요.</p>
+  <p>보스방 앞의 캠파 오염 수치 → 영원한 밤 → 룬 세팅 → 어비스를 선택하고 결과 확인을 누르세요.</p>
 
   <div class="card">
     <label>캠파 현재 오염 수치 (0~299)</label>
     <input id="stack" type="number" min="0" max="299" value="200" inputmode="numeric" pattern="[0-9]*">
 
-    <label>세팅</label>
-    <div class="tabs setupTabs" role="group" aria-label="세팅 선택">
-      <button type="button" class="tab active" data-target="setup" data-value="one">노 영밤<br>1침식</button>
-      <button type="button" class="tab" data-target="setup" data-value="twoNoNight">노 영밤<br>2침식</button>
-      <button type="button" class="tab" data-target="setup" data-value="two">영밤<br>2침식</button>
+    <label>영원한 밤</label>
+    <div class="tabs nightTabs" role="group" aria-label="영원한 밤 선택">
+      <button type="button" class="tab active" data-target="night" data-value="off">영밤 OFF</button>
+      <button type="button" class="tab" data-target="night" data-value="on">영밤 ON</button>
     </div>
-    <input id="setup" type="hidden" value="one">
+    <input id="night" type="hidden" value="off">
+
+    <label>룬 세팅</label>
+    <div class="tabs runeTabs" role="group" aria-label="침식 룬 선택">
+      <button type="button" class="tab active" data-target="runes" data-value="1">1침식</button>
+      <button type="button" class="tab" data-target="runes" data-value="2">2침식</button>
+      <button type="button" class="tab" data-target="runes" data-value="3">3침식</button>
+    </div>
+    <input id="runes" type="hidden" value="1">
 
     <label>어비스</label>
     <div class="tabs dungeonTabs" role="group" aria-label="어비스 선택">
@@ -97,25 +106,30 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
   </div>
 
   <div class="card small">
-    기준: 300 도달 즉시 오염 진입. 오염 종료 후 0부터 다시 축적.
-    강화 구간은 100 이상 300 미만입니다.
+    기준: 침식 룬 1개당 초당 침식 +5. 300 도달 즉시 오염 진입. 오염 종료 후 0부터 다시 축적.
+    강화 구간은 100 이상 300 미만입니다. 영밤 OFF는 오염 15초, 영밤 ON은 오염 10초로 계산합니다.
   </div>
   <div class="creator">만든이 : 아리아드네</div>
 </div>
 
 <script>
 (function(){
-  var setups = {
-    one:{name:"노 영밤 · 1침식", rate:5, polluted:15},
-    twoNoNight:{name:"노 영밤 · 2침식", rate:10, polluted:15},
-    two:{name:"영밤 · 2침식", rate:10, polluted:10.05}
-  };
   var dungeons = {
     dock:{name:"허상의 정박지", time:15},
     cave:{name:"광기의 동굴", time:35},
     water:{name:"흩어진 물길", time:40},
     custom:{name:"기타", time:0}
   };
+
+  function getSetup(){
+    var runeCount=parseInt(document.getElementById("runes").value,10) || 1;
+    var nightOn=document.getElementById("night").value === "on";
+    return {
+      name:(nightOn ? "영밤 ON" : "영밤 OFF")+" · "+runeCount+"침식",
+      rate:runeCount*5,
+      polluted:nightOn ? 10 : 15
+    };
+  }
 
   function selectTab(button){
     var target=button.getAttribute("data-target");
@@ -227,7 +241,7 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
       var dur=parseInt(document.getElementById("duration").value,10);
       if(isNaN(dur)||dur<=0) dur=10;
 
-      var s=setups[document.getElementById("setup").value];
+      var s=getSetup();
       var d=dungeons[document.getElementById("dungeon").value];
       if(document.getElementById("dungeon").value==="custom"){
         var customTime=parseInt(document.getElementById("customTime").value,10);
