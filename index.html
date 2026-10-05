@@ -16,14 +16,16 @@ input,select,button{width:100%;box-sizing:border-box;border-radius:12px;padding:
 input,select{background:#101319;color:white;border:1px solid #2b3140}
 button{margin-top:16px;border:0;background:#f3aa8e;color:#171a2b;font-weight:800}
 .tabs{display:grid;gap:8px}
-.nightTabs{grid-template-columns:repeat(2,1fr)}
+.stateTabs,.nightTabs{grid-template-columns:repeat(2,1fr)}
 .runeTabs{grid-template-columns:repeat(3,1fr)}
 .dungeonTabs{grid-template-columns:repeat(2,1fr)}
 .tab{margin:0;padding:11px 8px;background:#101319;color:#cbd2df;border:1px solid #2b3140;font-size:14px;line-height:1.3}
+.tab[data-target="currentState"].active{background:#ff9b8f;color:#171a2b;border-color:#ff9b8f}
 .tab[data-target="night"].active{background:#b8a7f2;color:#171a2b;border-color:#b8a7f2}
 .tab[data-target="runes"].active{background:#b8a7f2;color:#171a2b;border-color:#b8a7f2}
 .tab[data-target="dungeon"].active{background:#83d8c3;color:#171a2b;border-color:#83d8c3}
-.customTime{margin-top:8px}
+.stateInput,.customTime{margin-top:8px}
+.inputHint{margin-top:6px;color:#858d9d;font-size:12px;line-height:1.45}
 .result{font-size:15px;line-height:1.7}
 .resultTitle{font-size:20px;font-weight:800;margin-bottom:8px}
 .good{color:#65d09b;font-size:22px;font-weight:900}
@@ -49,11 +51,26 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
 <body>
 <div class="wrap">
   <h1>어비스 침식 브익 계산기</h1>
-  <p>보스방 앞의 캠파 침식 수치 → 영원한 밤 → 룬 세팅 → 어비스를 선택하고 결과 확인을 누르세요.</p>
+  <p>보스방 앞 캠파의 현재 상태 → 영원한 밤 → 룬 세팅 → 어비스를 선택하고 결과 확인을 누르세요.</p>
 
   <div class="card">
-    <label>캠파 현재 침식 수치 (0~299)</label>
-    <input id="stack" type="number" min="0" max="299" value="200" inputmode="numeric" pattern="[0-9]*">
+    <label>캠파 현재 상태</label>
+    <div class="tabs stateTabs" role="group" aria-label="캠파 현재 상태 선택">
+      <button type="button" class="tab active" data-target="currentState" data-value="stack">침식 수치</button>
+      <button type="button" class="tab" data-target="currentState" data-value="pollution">오염 중</button>
+    </div>
+    <input id="currentState" type="hidden" value="stack">
+
+    <div class="stateInput" id="stackInputWrap">
+      <label for="stack">현재 침식 수치 (0~299)</label>
+      <input id="stack" type="number" min="0" max="299" value="200" inputmode="numeric" pattern="[0-9]*">
+    </div>
+
+    <div class="stateInput" id="pollutionInputWrap" hidden>
+      <label for="pollutionElapsed" id="pollutionElapsedLabel">오염 경과 시간 (0~15초)</label>
+      <input id="pollutionElapsed" type="number" min="0" max="15" value="0" step="1" inputmode="numeric" pattern="[0-9]*">
+      <div class="inputHint" id="pollutionHint">오염이 시작된 뒤 지난 시간을 입력하세요. 영밤 OFF는 총 15초입니다.</div>
+    </div>
 
     <label>영원한 밤</label>
     <div class="tabs nightTabs" role="group" aria-label="영원한 밤 선택">
@@ -83,7 +100,7 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
       <input id="customTime" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" placeholder="예: 16, 17, 43">
     </div>
 
-    <label>브익 지속시간 (초)</label>
+    <label for="duration">브익 지속시간 (초)</label>
     <input id="duration" type="number" min="1" max="30" step="1" value="10" inputmode="numeric" pattern="[0-9]*">
 
     <button type="button" id="calcBtn">결과 확인</button>
@@ -108,6 +125,7 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
   <div class="card small">
     기준: 침식 룬 1개당 초당 침식 +5. 300 도달 즉시 오염 진입. 오염 종료 후 0부터 다시 축적.
     강화 구간은 100 이상 300 미만입니다. 영밤 OFF는 오염 15초, 영밤 ON은 오염 10초로 계산합니다.
+    캠파 확인 시 이미 오염 중이라면 오염이 시작된 뒤 지난 시간을 입력하세요.
   </div>
   <div class="creator">만든이 : 아리아드네</div>
 </div>
@@ -131,6 +149,23 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
     };
   }
 
+  function updateStateInputs(){
+    var pollutionSelected=document.getElementById("currentState").value === "pollution";
+    document.getElementById("stackInputWrap").hidden=pollutionSelected;
+    document.getElementById("pollutionInputWrap").hidden=!pollutionSelected;
+
+    var maxTime=getSetup().polluted;
+    var elapsedInput=document.getElementById("pollutionElapsed");
+    elapsedInput.max=String(maxTime);
+    if(parseInt(elapsedInput.value,10)>maxTime) elapsedInput.value=String(maxTime);
+    document.getElementById("pollutionElapsedLabel").textContent="오염 경과 시간 (0~"+maxTime+"초)";
+    document.getElementById("pollutionHint").textContent=
+      "오염이 시작된 뒤 지난 시간을 입력하세요. "+
+      (maxTime===10 ? "영밤 ON은 총 10초입니다." : "영밤 OFF는 총 15초입니다.");
+
+    if(pollutionSelected) elapsedInput.focus();
+  }
+
   function selectTab(button){
     var target=button.getAttribute("data-target");
     var value=button.getAttribute("data-value");
@@ -142,6 +177,7 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
       wrap.hidden=value!=="custom";
       if(value==="custom") document.getElementById("customTime").focus();
     }
+    if(target==="currentState"||target==="night") updateStateInputs();
   }
 
   var tabButtons=document.querySelectorAll(".tab");
@@ -149,7 +185,7 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
     tabButtons[tabIndex].addEventListener("click",function(){ selectTab(this); });
   }
 
-  var integerInputs=["stack","customTime","duration"];
+  var integerInputs=["stack","pollutionElapsed","customTime","duration"];
   for(var inputIndex=0;inputIndex<integerInputs.length;inputIndex++){
     document.getElementById(integerInputs[inputIndex]).addEventListener("input",function(){
       this.value=this.value.replace(/[^0-9]/g,"");
@@ -161,42 +197,54 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
     return Math.abs(r-Math.round(r))<0.0001 ? String(Math.round(r)) : r.toFixed(1);
   }
 
-  function getState(start, t, s){
+  function getState(initial, t, s){
     var time=0;
-    var stack=start;
+    var stack=initial.kind==="stack" ? initial.stack : 0;
     var guard=0;
+
+    if(initial.kind==="pollution"){
+      var remaining=Math.max(0,s.polluted-initial.elapsed);
+      if(t < remaining-0.0000001){
+        return {kind:"pollution",elapsed:initial.elapsed+t};
+      }
+      time=remaining;
+      if(Math.abs(t-time)<0.0000001){
+        return {kind:"normal",stack:0};
+      }
+    }
+
     while(guard++<100){
       var to300=(300-stack)/s.rate;
 
       if(t < time+to300-0.0000001){
         var current=stack+s.rate*(t-time);
-        return {kind:(current>=100?"boost":"normal"), stack:current};
+        return {kind:(current>=100?"boost":"normal"),stack:current};
       }
 
       time += to300;
 
       if(t < time+s.polluted-0.0000001){
-        return {kind:"pollution", elapsed:t-time};
+        return {kind:"pollution",elapsed:t-time};
       }
 
       time += s.polluted;
       stack=0;
 
       if(Math.abs(t-time)<0.0000001){
-        return {kind:"normal", stack:0};
+        return {kind:"normal",stack:0};
       }
     }
     return {kind:"error"};
   }
 
-  function getBreakSummary(start, from, dur, s){
+  function getBreakSummary(initial, from, dur, s){
     var step=0.01;
     var normal=0, boost=0, pollution=0;
     var segments=[];
     var t=0;
     while(t<dur-0.000001){
       var slice=Math.min(step,dur-t);
-      var st=getState(start,from+t+slice/2,s);
+      var st=getState(initial,from+t+slice/2,s);
       if(st.kind==="boost") boost+=slice;
       else if(st.kind==="pollution") pollution+=slice;
       else normal+=slice;
@@ -233,15 +281,30 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
 
   function calculate(){
     try{
-      var start=parseFloat(document.getElementById("stack").value);
-      if(isNaN(start)) start=0;
-      if(start<0) start=0;
-      if(start>299) start=299;
+      var s=getSetup();
+      var initial;
+      var initialDescription;
+
+      if(document.getElementById("currentState").value==="pollution"){
+        var elapsed=parseInt(document.getElementById("pollutionElapsed").value,10);
+        if(isNaN(elapsed)||elapsed<0||elapsed>s.polluted){
+          document.getElementById("pollutionElapsed").focus();
+          throw new Error("오염 경과 시간을 0~"+s.polluted+"초로 입력해 주세요.");
+        }
+        initial={kind:"pollution",elapsed:elapsed};
+        initialDescription="오염 "+elapsed+"초째 (남은 시간 "+(s.polluted-elapsed)+"초)";
+      }else{
+        var start=parseInt(document.getElementById("stack").value,10);
+        if(isNaN(start)) start=0;
+        if(start<0) start=0;
+        if(start>299) start=299;
+        initial={kind:"stack",stack:start};
+        initialDescription=start+" 스택";
+      }
 
       var dur=parseInt(document.getElementById("duration").value,10);
       if(isNaN(dur)||dur<=0) dur=10;
 
-      var s=getSetup();
       var d=dungeons[document.getElementById("dungeon").value];
       if(document.getElementById("dungeon").value==="custom"){
         var customTime=parseInt(document.getElementById("customTime").value,10);
@@ -252,8 +315,8 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
         d={name:"기타 ("+customTime+"초 후)",time:customTime};
       }
 
-      var st=getState(start,d.time,s);
-      var sum=getBreakSummary(start,d.time,dur,s);
+      var st=getState(initial,d.time,s);
+      var sum=getBreakSummary(initial,d.time,dur,s);
 
       var main=document.getElementById("mainState");
       var details=document.getElementById("details");
@@ -281,7 +344,8 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
       }
 
       details.innerHTML=
-        "<hr><b>"+d.name+"</b> / "+s.name+
+        "<hr><b>캠파 확인 시:</b> "+initialDescription+
+        "<br><b>"+d.name+"</b> / "+s.name+
         "<br>보스방 입장 후 <b>"+d.time+"초</b>에 브익 시작"+
         "<br>"+verdict+
         "<br><br>브익 "+fmt(dur)+"초 구성"+
@@ -292,11 +356,12 @@ hr{border:0;border-top:1px solid #2b3140;margin:14px 0}
     }catch(e){
       document.getElementById("mainState").className="bad";
       document.getElementById("mainState").textContent="계산 오류";
-      document.getElementById("details").textContent=String(e);
+      document.getElementById("details").textContent=String(e.message||e);
       document.getElementById("graph").hidden=true;
     }
   }
 
+  updateStateInputs();
   document.getElementById("calcBtn").onclick=calculate;
 })();
 </script>
